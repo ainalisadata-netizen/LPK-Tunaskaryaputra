@@ -1,19 +1,26 @@
 // src/app/admin/graduates/page.js
-import GraduatesManager from '@/components/admin/GraduatesManager';
+
+export const dynamic = 'force-dynamic';
+
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
 export default async function GraduatesPage() {
-  let supabase;
+  let user, graduates;
   
   try {
-    supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = createClient();
+
+    // Check authentication
+    const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
     
-    if (!user) {
+    if (userError || !userData) {
       redirect('/login');
     }
 
+    user = userData;
+
+    // Check if user is admin
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -21,32 +28,68 @@ export default async function GraduatesPage() {
       .single();
 
     if (profile?.role !== 'admin') {
-      redirect('/login');
+      redirect('/dashboard');
+    }
+
+    // Fetch graduates data
+    const { data: graduatesData, error: graduatesError } = await supabase
+      .from('graduates')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (graduatesError) {
+      console.error('Error fetching graduates:', graduatesError);
+    } else {
+      graduates = graduatesData || [];
     }
 
   } catch (error) {
-    console.error('Graduates page error:', error);
+    console.error('Error in graduates page:', error);
     redirect('/login');
   }
 
   return (
-    <div className="space-y-8">
-      <div className="px-6 pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold text-white mb-2">
-              📊 Data Lulusan
-            </h2>
-            <p className="text-gray-400">
-              Kelola data lulusan pelatihan
-            </p>
-          </div>
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Data Lulusan</h1>
+      
+      {graduates && graduates.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nama
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Program
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tanggal Lulus
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {graduates.map((graduate) => (
+                <tr key={graduate.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {graduate.full_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {graduate.program_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(graduate.graduation_date).toLocaleDateString('id-ID')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
-
-      <div className="px-6 pb-6">
-        <GraduatesManager />
-      </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800">Tidak ada data lulusan.</p>
+        </div>
+      )}
     </div>
   );
 }

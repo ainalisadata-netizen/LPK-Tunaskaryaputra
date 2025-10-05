@@ -1,75 +1,99 @@
 // src/app/admin/layout.js
+
+export const dynamic = 'force-dynamic';
+
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import AdminNavbar from '@/components/admin/AdminNavbar';
+import Link from 'next/link';
+import LogoutButton from '@/components/LogoutButton';
 
 export default async function AdminLayout({ children }) {
-  let supabase;
-  let user = null;
+  let user;
   
   try {
-    supabase = await createClient();
-    const { data: authData } = await supabase.auth.getUser();
-    user = authData?.user;
+    const supabase = createClient();
 
-    if (!user) redirect('/login');
+    // Check authentication
+    const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !userData) {
+      redirect('/login');
+    }
 
+    user = userData;
+
+    // Check if user is admin
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') redirect('/login');
+    if (profile?.role !== 'admin') {
+      redirect('/dashboard');
+    }
 
   } catch (error) {
-    console.error('Admin layout error:', error);
+    console.error('Error in admin layout:', error);
     redirect('/login');
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-      <AdminNavbar />
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8 p-6 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl border border-cyan-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  Selamat Datang di Admin Panel
-                </h1>
-                <p className="text-cyan-200">
-                  Halo, {user?.email} 👋 - Kelola konten situs dengan mudah
-                </p>
-              </div>
-              <div className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/10 rounded-lg border border-white/20">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-green-300 font-medium">Online</span>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Admin Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+              <p className="text-sm text-gray-600">LPK Tunas Karya Putra</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                {user?.email}
+              </span>
+              <LogoutButton />
             </div>
           </div>
+        </div>
+      </header>
 
-          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
-            {children}
+      {/* Admin Navigation */}
+      <nav className="bg-white shadow-sm">
+        <div className="container mx-auto px-6">
+          <div className="flex space-x-8">
+            <Link 
+              href="/admin" 
+              className="py-4 px-2 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-blue-500 transition-colors"
+            >
+              Dashboard
+            </Link>
+            <Link 
+              href="/admin/graduates" 
+              className="py-4 px-2 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-blue-500 transition-colors"
+            >
+              Data Lulusan
+            </Link>
+            <Link 
+              href="/admin/programs" 
+              className="py-4 px-2 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-blue-500 transition-colors"
+            >
+              Program
+            </Link>
+            <Link 
+              href="/admin/site-content" 
+              className="py-4 px-2 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-blue-500 transition-colors"
+            >
+              Konten Website
+            </Link>
           </div>
         </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="container mx-auto py-8">
+        {children}
       </main>
-
-      <footer className="border-t border-gray-700/50 mt-16">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
-            <div className="text-gray-400 text-sm">
-              © {new Date().getFullYear()} Admin CMS. All rights reserved.
-            </div>
-            <div className="flex items-center space-x-4 mt-4 md:mt-0">
-              <span className="text-gray-500 text-sm">v1.0.0</span>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-green-400 text-sm font-medium">System Operational</span>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
